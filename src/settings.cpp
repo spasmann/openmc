@@ -313,6 +313,8 @@ void get_run_parameters(pugi::xml_node node_base)
         RandomRay::sample_method_ = RandomRaySampleMethod::PRNG;
       } else if (temp_str == "halton") {
         RandomRay::sample_method_ = RandomRaySampleMethod::HALTON;
+      } else if (temp_str == "sobol") {
+        RandomRay::sample_method_ = RandomRaySampleMethod::SOBOL;
       } else {
         fatal_error("Unrecognized sample method: " + temp_str);
       }

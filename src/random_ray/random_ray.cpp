@@ -518,7 +518,10 @@ void RandomRay::initialize_ray(uint64_t ray_id, FlatSourceDomain* domain)
     site = sample_prng();
     break;
   case RandomRaySampleMethod::HALTON:
-    site = sample_halton();
+    site = sample_rqmc();
+    break;
+  case RandomRaySampleMethod::SOBOL:
+    site = sample_rqmc();
     break;
   default:
     fatal_error("Unknown sample method for random ray transport.");
@@ -565,18 +568,28 @@ SourceSite RandomRay::sample_prng()
   return site;
 }
 
-SourceSite RandomRay::sample_halton()
+SourceSite RandomRay::sample_rqmc()
 {
   SourceSite site;
 
   // Set random number seed
   int64_t batch_seed = (simulation::current_batch - 1) * settings::n_particles;
-  int64_t skip = id();
+  int64_t index = id();
   init_particle_seeds(batch_seed, seeds());
   stream() = STREAM_TRACKING;
 
   // Calculate next samples in LDS across 5 dimensions
-  vector<double> samples = rhalton(5, current_seed(), skip = skip);
+  vector<double> samples(4);
+  switch (sample_method_) {
+    case RandomRaySampleMethod::HALTON:
+      samples = rhalton(5, current_seed(), index);
+      break;
+    case RandomRaySampleMethod::SOBOL:
+      samples = shuffled_scrambled_sobol(5, current_seed(), index);
+      break;
+    default:
+      fatal_error("Unknown sample method for random ray transport.");
+    }
 
   // Get spatial box of ray_source_
   SpatialBox* sb = dynamic_cast<SpatialBox*>(
