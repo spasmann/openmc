@@ -173,6 +173,14 @@ class CoupledOperator(OpenMCOperator):
 
         .. versionadded:: 0.14.0
 
+    update_neutron_weight_windows: bool
+
+    update_photon_weight_windows: bool
+
+    neutron_flux_tally_id: int
+
+    photon_flux_tally_id: int
+
     Attributes
     ----------
     model : openmc.model.Model
@@ -214,7 +222,11 @@ class CoupledOperator(OpenMCOperator):
                  normalization_mode="fission-q", fission_q=None,
                  fission_yield_mode="constant", fission_yield_opts=None,
                  reaction_rate_mode="direct", reaction_rate_opts=None,
-                 reduce_chain=False, reduce_chain_level=None):
+                 reduce_chain=False, reduce_chain_level=None,
+                 update_neutron_weight_windows=False,
+                 update_photon_weight_windows=False,
+                 neutron_flux_tally_id=None,
+                 photon_flux_tally_id=None,):
 
         # check for old call to constructor
         if isinstance(model, openmc.Geometry):
@@ -260,6 +272,17 @@ class CoupledOperator(OpenMCOperator):
 
         # Records how many times the operator has been called
         self._n_calls = 0
+
+        if update_neutron_weight_windows:
+            self._update_neutron_weight_windows = True
+            self._neutron_flux_tally_id = neutron_flux_tally_id
+        else:
+            self._update_neutron_weight_windows = False
+        if update_photon_weight_windows:
+            self._update_photon_weight_windows = True
+            self._photon_flux_tally_id = photon_flux_tally_id
+        else:
+            self._update_photon_weight_windows = False
 
         super().__init__(
             materials=model.materials,
@@ -449,7 +472,39 @@ class CoupledOperator(OpenMCOperator):
             return OperatorResult(ufloat(0.0, 0.0), rates)
 
         # Run OpenMC
-        openmc.lib.run()
+        if self._update_neutron_weight_windows or self._update_photon_weight_windows:
+            with openmc.lib.run_in_memory():
+                model = self.model
+                model.export_to_model_xml()
+                
+                if self._update_neutron_weight_windows:
+                    # update neutron ww
+                    ww_neutron_flux_tally = openmc.lib.tallies[self._neutron_flux_tally_id]
+                    ww_neutron = openmc.lib.WeightWindows.from_tally(ww_neutron_flux_tally,
+                                                                     particle="neutron")
+                    # ww_neutron.energy_bounds = MESH_ENERGY_BINS
+
+                if self._update_photon_weight_windows:
+                    # update photon ww
+                    ww_photon_flux_tally = openmc.lib.tallies[self._photon_flux_tally_id]
+                    ww_photon = openmc.lib.WeightWindows.from_tally(ww_photon_flux_tally,
+                                                                    particle="photon")
+                    # ww_photon.energy_bounds = MESH_ENERGY_BINS
+
+                model.settings.max_history_splits = 1_000
+                # turn the weight windows on
+                openmc.lib.settings.weight_windows_on = True
+
+                openmc.lib.simulation_init()
+                for _ in openmc.lib.iter_batches():
+                    # updates the weight window with the latest mesh tally flux results
+                    if self._update_neutron_weight_windows:
+                        ww_neutron.update_magic(ww_neutron_flux_tally)
+                    if self._update_photon_weight_windows:
+                        ww_photon.update_magic(ww_photon_flux_tally)
+                openmc.lib.simulation_finalize()
+        else:
+            openmc.lib.run()
 
         # Extract results
         rates = self._calculate_reaction_rates(source_rate)
