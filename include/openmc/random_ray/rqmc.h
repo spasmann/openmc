@@ -8,11 +8,13 @@
 
 namespace openmc{
 
-vector<double> rhalton(int64_t dim, uint64_t* seed, int64_t index);
+vector<double> halton_rand(int64_t dim, uint64_t* seed, int64_t index);
 
-vector<uint32_t> sobol(int64_t dim, uint32_t index);
+vector<double> halton(int64_t dim, int64_t index);
 
-vector<double> shuffled_scrambled_sobol(int64_t dim, uint64_t* seed, uint32_t index);
+vector<uint32_t> sobol(int32_t dim, uint32_t index);
+
+vector<double> sobol_shuffled_scrambled(int32_t dim, uint64_t* seed, uint32_t index);
 
 inline uint32_t hash_combine(uint32_t seed, uint32_t v)
 {

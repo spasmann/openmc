@@ -579,13 +579,13 @@ SourceSite RandomRay::sample_rqmc()
   stream() = STREAM_TRACKING;
 
   // Calculate next samples in LDS across 5 dimensions
-  vector<double> samples(4);
+  vector<double> samples(5);
   switch (sample_method_) {
     case RandomRaySampleMethod::HALTON:
-      samples = rhalton(5, current_seed(), index);
+      samples = halton_rand(5, current_seed(), index);
       break;
     case RandomRaySampleMethod::SOBOL:
-      samples = shuffled_scrambled_sobol(5, current_seed(), index);
+      samples = sobol_shuffled_scrambled(5, current_seed(), index);
       break;
     default:
       fatal_error("Unknown sample method for random ray transport.");

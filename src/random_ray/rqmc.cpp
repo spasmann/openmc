@@ -44,14 +44,14 @@ void fisher_yates_shuffle(vector<int64_t>& arr, uint64_t* seed)
 // Algorithm adapted from:
 //      A. B. Owen. A randomized halton algorithm in r. Arxiv, 6 2017.
 //      URL https://arxiv.org/abs/1706.02808
-vector<double> rhalton(int64_t dim, uint64_t* seed, int64_t index)
+vector<double> halton_rand(int64_t dim, uint64_t* seed, int64_t index)
 {
   if (dim > 10) {
     fatal_error("Halton sampling dimension too large");
   }
   int64_t b, res, dig;
   double b2r, ans;
-const std::array<int64_t, 10> primes = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29};
+  const std::array<int64_t, 10> primes = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29};
   vector<double> halton(dim, 0.0);
   vector<int64_t> perm;
 
@@ -80,7 +80,33 @@ const std::array<int64_t, 10> primes = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29};
 //==============================================================================
 // Halton Sequence
 //==============================================================================
+vector<double> halton(int64_t dim, int64_t index)
+{
+  if (dim > 10) {
+    fatal_error("Halton sampling dimension too large");
+  }
+  int64_t b, res, dig;
+  double b2r, ans;
+  const std::array<int64_t, 10> primes = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29};
+  vector<double> halton(dim, 0.0);
 
+  for (int D = 0; D < dim; ++D) {
+    b = primes[D];
+    b2r = 1.0 / b;
+    res = index+1;
+    ans = 0.0;
+
+    while ((1.0 - b2r) < 1.0) {
+      ans += (res % b) * b2r;
+      b2r /= b;
+      res = floor(res/b);
+    }
+
+    halton[D] = ans;
+  }
+
+  return halton;
+}
 
 //==============================================================================
 // Sobol Sequence (Hash Based)
@@ -133,11 +159,12 @@ uint32_t directions[5][32] = {
   0x800228f8, 0x400b3cdc, 0x200fb67a, 0xb00ddb9d,
 };
 
-vector<uint32_t> sobol(int64_t dim, uint32_t index)
+
+vector<uint32_t> sobol(int32_t dim, uint32_t index)
 {
   vector<uint32_t> samples(dim, 0);
 
-  for (int d = 0; d < dim; dim++) {
+  for (int d = 0; d < dim; d++) {
     for (int bit = 0; bit < 32; bit++) {
       int mask = (index >> bit) & 1;
       samples[d] ^= mask * directions[d][bit];
@@ -146,30 +173,24 @@ vector<uint32_t> sobol(int64_t dim, uint32_t index)
   return samples;
 }
 
-vector<double> shuffled_scrambled_sobol(int64_t dim, uint64_t* seed, uint32_t index)
+vector<double> sobol_shuffled_scrambled(int32_t dim, uint64_t* seed, uint32_t index)
 {
-  if (dim > 4) {
+  if (dim > 5) {
     fatal_error("Sobol sampling dimension too large");
   }
-  vector<uint32_t> sobol_samples(dim, 0);
   vector<double> samples(dim, 0.0);
 
-  uint32_t hseed = hash(*seed);
+  uint32_t seed_32 = uint32_t(*seed); // cast to 32 bit
+  uint32_t hseed = hash(seed_32);
 
   index = nested_uniform_scramble_base2(index, hseed);
-  sobol_samples = sobol(dim, index);
+  vector<uint32_t> sobol_samples = sobol(dim, index);
+
   for (int d = 0; d < dim; d++) {
-    samples[d] = nested_uniform_scramble_base2(sobol_samples[d], hash_combine(hseed, d)) * S;
+    samples[d] = double(nested_uniform_scramble_base2(sobol_samples[d], hash_combine(hseed, d)) * S);
   }
 
   return samples;
 }
-
-
-//==============================================================================
-// Owen Scrambling (Burley, 2020)
-//==============================================================================
-
-
 
 } // namespace openmc
