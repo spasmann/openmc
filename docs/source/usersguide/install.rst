@@ -287,9 +287,8 @@ Prerequisites
       Adding this option allows the creation of materials from NCrystal, which
       replaces the scattering kernel treatment of ACE files with a modular,
       on-the-fly approach. To use it `install
-      <https://github.com/mctools/ncrystal/wiki/Get-NCrystal>`_ and `initialize
-      <https://github.com/mctools/ncrystal/wiki/Using-NCrystal#setting-up>`_
-      NCrystal and turn on the option in the CMake configuration step::
+      <https://github.com/mctools/ncrystal/wiki/Get-NCrystal>`_ NCrystal and
+      turn on the option in the CMake configuration step::
 
           cmake -DOPENMC_USE_NCRYSTAL=on ..
 
@@ -583,10 +582,6 @@ distributions.
       mpi4py provides Python bindings to MPI for running distributed-memory
       parallel runs. This package is needed if you plan on running depletion
       simulations in parallel using MPI.
-
-   `Cython <https://cython.org/>`_
-      Cython is used for resonance reconstruction for ENDF data converted to
-      :class:`openmc.data.IncidentNeutron`.
 
    `vtk <https://vtk.org/>`_
       The Python VTK bindings are needed to convert voxel and track files to VTK

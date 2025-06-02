@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
 project(openmc C CXX)
 
 # Set version numbers
 set(OPENMC_VERSION_MAJOR 0)
-set(OPENMC_VERSION_MINOR 14)
+set(OPENMC_VERSION_MINOR 15)
 set(OPENMC_VERSION_RELEASE 1)
 set(OPENMC_VERSION ${OPENMC_VERSION_MAJOR}.${OPENMC_VERSION_MINOR}.${OPENMC_VERSION_RELEASE})
 configure_file(include/openmc/version.h.in "${CMAKE_BINARY_DIR}/include/openmc/version.h" @ONLY)
@@ -15,11 +15,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # Set module path
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules)
-
-# Allow user to specify <project>_ROOT variables
-if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.12)
-  cmake_policy(SET CMP0074 NEW)
-endif()
 
 # Enable correct usage of CXX_EXTENSIONS
 if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.22)
@@ -40,6 +35,17 @@ option(OPENMC_USE_MPI         "Enable MPI"                                      
 option(OPENMC_USE_MCPL        "Enable MCPL"                                          OFF)
 option(OPENMC_USE_NCRYSTAL    "Enable support for NCrystal scattering"               OFF)
 option(OPENMC_USE_UWUW        "Enable UWUW"                                          OFF)
+
+message(STATUS "OPENMC_USE_OPENMP ${OPENMC_USE_OPENMP}")
+message(STATUS "OPENMC_BUILD_TESTS ${OPENMC_BUILD_TESTS}")
+message(STATUS "OPENMC_ENABLE_PROFILE ${OPENMC_ENABLE_PROFILE}")
+message(STATUS "OPENMC_ENABLE_COVERAGE ${OPENMC_ENABLE_COVERAGE}")
+message(STATUS "OPENMC_USE_DAGMC ${OPENMC_USE_DAGMC}")
+message(STATUS "OPENMC_USE_LIBMESH ${OPENMC_USE_LIBMESH}")
+message(STATUS "OPENMC_USE_MPI ${OPENMC_USE_MPI}")
+message(STATUS "OPENMC_USE_MCPL ${OPENMC_USE_MCPL}")
+message(STATUS "OPENMC_USE_NCRYSTAL ${OPENMC_USE_NCRYSTAL}")
+message(STATUS "OPENMC_USE_UWUW ${OPENMC_USE_UWUW}")
 
 # Warnings for deprecated options
 foreach(OLD_OPT IN ITEMS "openmp" "profile" "coverage" "dagmc" "libmesh")
@@ -115,7 +121,15 @@ endmacro()
 #===============================================================================
 
 if(OPENMC_USE_NCRYSTAL)
-  find_package(NCrystal REQUIRED)
+  if(NOT DEFINED "NCrystal_DIR")
+    #Invocation of "ncrystal-config --show cmakedir" is needed to find NCrystal
+    #when it is installed from Python wheels:
+    execute_process(
+      COMMAND "ncrystal-config" "--show" "cmakedir"
+      OUTPUT_VARIABLE "NCrystal_DIR" OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+  endif()
+  find_package(NCrystal 3.8.0 REQUIRED)
   message(STATUS "Found NCrystal: ${NCrystal_DIR} (version ${NCrystal_VERSION})")
 endif()
 
@@ -272,11 +286,6 @@ endif()
 # xtensor header-only library
 #===============================================================================
 
-# CMake 3.13+ will complain about policy CMP0079 unless it is set explicitly
-if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.13)
-  cmake_policy(SET CMP0079 NEW)
-endif()
-
 find_package_write_status(xtensor)
 if (NOT xtensor_FOUND)
   add_subdirectory(vendor/xtl)
@@ -390,6 +399,10 @@ list(APPEND libopenmc_SOURCES
   src/random_ray/random_ray_simulation.cpp
   src/random_ray/random_ray.cpp
   src/random_ray/flat_source_domain.cpp
+  src/random_ray/linear_source_domain.cpp
+  src/random_ray/moment_matrix.cpp
+  src/random_ray/source_region.cpp
+  src/random_ray/rqmc.cpp
   src/reaction.cpp
   src/reaction_product.cpp
   src/scattdata.cpp
@@ -424,6 +437,7 @@ list(APPEND libopenmc_SOURCES
   src/tallies/filter_meshborn.cpp
   src/tallies/filter_meshsurface.cpp
   src/tallies/filter_mu.cpp
+  src/tallies/filter_musurface.cpp
   src/tallies/filter_particle.cpp
   src/tallies/filter_polar.cpp
   src/tallies/filter_sph_harm.cpp
@@ -517,6 +531,14 @@ endif()
 if(OPENMC_USE_DAGMC)
   target_compile_definitions(libopenmc PRIVATE DAGMC)
   target_link_libraries(libopenmc dagmc-shared)
+
+  if(OPENMC_USE_UWUW)
+    target_compile_definitions(libopenmc PRIVATE OPENMC_UWUW)
+    target_link_libraries(libopenmc uwuw-shared)
+  endif()
+elseif(OPENMC_USE_UWUW)
+  set(OPENMC_USE_UWUW OFF)
+  message(FATAL_ERROR "DAGMC must be enabled when UWUW is enabled.")
 endif()
 
 if(OPENMC_USE_LIBMESH)
@@ -553,11 +575,6 @@ if(OPENMC_USE_NCRYSTAL)
   target_link_libraries(libopenmc NCrystal::NCrystal)
 endif()
 
-if (OPENMC_USE_UWUW)
-  target_compile_definitions(libopenmc PRIVATE UWUW)
-  target_link_libraries(libopenmc uwuw-shared)
-endif()
-
 #===============================================================================
 # Log build info that this executable can report later
 #===============================================================================
@@ -580,9 +597,9 @@ target_compile_options(openmc PRIVATE ${cxxflags})
 target_include_directories(openmc PRIVATE ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(openmc libopenmc)
 
-# Ensure C++14 standard is used and turn off GNU extensions
-target_compile_features(openmc PUBLIC cxx_std_14)
-target_compile_features(libopenmc PUBLIC cxx_std_14)
+# Ensure C++17 standard is used and turn off GNU extensions
+target_compile_features(openmc PUBLIC cxx_std_17)
+target_compile_features(libopenmc PUBLIC cxx_std_17)
 set_target_properties(openmc libopenmc PROPERTIES CXX_EXTENSIONS OFF)
 
 #===============================================================================

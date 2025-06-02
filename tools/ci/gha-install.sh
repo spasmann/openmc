@@ -16,7 +16,9 @@ fi
 
 # Install NCrystal if needed
 if [[ $NCRYSTAL = 'y' ]]; then
-    ./tools/ci/gha-install-ncrystal.sh
+    pip install 'ncrystal>=4.0.0'
+    #Basic quick verification:
+    nctool --test
 fi
 
 # Install vectfit for WMP generation if needed
@@ -40,18 +42,11 @@ if [[ $MPI == 'y' ]]; then
     export CC=mpicc
     export HDF5_MPI=ON
     export HDF5_DIR=/usr/lib/x86_64-linux-gnu/hdf5/mpich
-    pip install wheel "cython<3.0"
-    pip install --no-binary=h5py --no-build-isolation h5py
+    pip install --no-binary=h5py h5py
 fi
 
 # Build and install OpenMC executable
 python tools/ci/gha-install.py
 
 # Install Python API in editable mode
-pip install -e .[test,vtk]
-
-# For coverage testing of the C++ source files
-pip install cpp-coveralls
-
-# For coverage testing of the Python source files
-pip install coveralls
+pip install -e .[test,vtk,ci]

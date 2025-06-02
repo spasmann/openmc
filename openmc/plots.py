@@ -1,7 +1,6 @@
 from collections.abc import Iterable, Mapping
 from numbers import Integral, Real
 from pathlib import Path
-from typing import Optional
 
 import h5py
 import lxml.etree as ET
@@ -14,7 +13,7 @@ from openmc.checkvalue import PathLike
 from ._xml import clean_indentation, get_elem_tuple, reorder_attributes, get_text
 from .mixin import IDManagerMixin
 
-_BASES = ['xy', 'xz', 'yz']
+_BASES = {'xy', 'xz', 'yz'}
 
 _SVG_COLORS = {
     'aliceblue': (240, 248, 255),
@@ -166,13 +165,104 @@ _SVG_COLORS = {
     'yellowgreen': (154, 205, 50)
 }
 
+_PLOT_PARAMS = """
+        Parameters
+        ----------
+        origin : iterable of float
+            Coordinates at the origin of the plot. If left as None,
+            the center of the bounding box will be used to attempt to ascertain
+            the origin with infinite values being replaced by 0.
+        width : iterable of float
+            Width of the plot in each basis direction. If left as none then the
+            width of the bounding box will be used to attempt to
+            ascertain the plot width. Defaults to (10, 10) if the bounding box
+            contains inf values.
+        pixels : Iterable of int or int
+            If iterable of ints provided then this directly sets the number of
+            pixels to use in each basis direction. If int provided then this
+            sets the total number of pixels in the plot and the number of
+            pixels in each basis direction is calculated from this total and
+            the image aspect ratio.
+        basis : {'xy', 'xz', 'yz'}
+            The basis directions for the plot
+        color_by : {'cell', 'material'}
+            Indicate whether the plot should be colored by cell or by material
+        colors : dict
+            Assigns colors to specific materials or cells. Keys are instances of
+            :class:`Cell` or :class:`Material` and values are RGB 3-tuples, RGBA
+            4-tuples, or strings indicating SVG color names. Red, green, blue,
+            and alpha should all be floats in the range [0.0, 1.0], for example:
+
+            .. code-block:: python
+
+                # Make water blue
+                water = openmc.Cell(fill=h2o)
+                universe.plot(..., colors={water: (0., 0., 1.))
+        seed : int
+            Seed for the random number generator
+        openmc_exec : str
+            Path to OpenMC executable.
+        axes : matplotlib.Axes
+            Axes to draw to
+
+            .. versionadded:: 0.13.1
+        legend : bool
+            Whether a legend showing material or cell names should be drawn
+
+            .. versionadded:: 0.14.0
+        outline : bool or str
+            Whether outlines between color boundaries should be drawn. If set to
+            'only', only outlines will be drawn.
+
+            .. versionadded:: 0.14.0
+        axis_units : {'km', 'm', 'cm', 'mm'}
+            Units used on the plot axis
+
+            .. versionadded:: 0.14.0
+        n_samples : int, optional
+            The number of source particles to sample and add to plot. Defaults
+            to None which doesn't plot any particles on the plot.
+        plane_tolerance: float
+            When plotting a plane the source locations within the plane +/-
+            the plane_tolerance will be included and those outside of the
+            plane_tolerance will not be shown
+        legend_kwargs : dict
+            Keyword arguments passed to :func:`matplotlib.pyplot.legend`.
+
+            .. versionadded:: 0.14.0
+        source_kwargs : dict, optional
+            Keyword arguments passed to :func:`matplotlib.pyplot.scatter`.
+        contour_kwargs : dict, optional
+            Keyword arguments passed to :func:`matplotlib.pyplot.contour`.
+        **kwargs
+            Keyword arguments passed to :func:`matplotlib.pyplot.imshow`.
+
+        Returns
+        -------
+        matplotlib.axes.Axes
+            Axes containing resulting image
+"""
+
+
+# Decorator for consistently adding plot parameters to docstrings (Model.plot,
+# Geometry.plot, Universe.plot, etc.)
+def add_plot_params(func):
+    func.__doc__ += _PLOT_PARAMS
+    return func
+
 
 def _get_plot_image(plot, cwd):
     from IPython.display import Image
 
     # Make sure .png file was created
-    stem = plot.filename if plot.filename is not None else f'plot_{plot.id}'
-    png_file = Path(cwd) / f'{stem}.png'
+    png_filename = plot.filename if plot.filename is not None else f'plot_{plot.id}'
+
+    # Add file extension if not already present. The C++ code added it
+    # automatically if it wasn't present.
+    if Path(png_filename).suffix != ".png":
+        png_filename += ".png"
+
+    png_file = Path(cwd) / png_filename
     if not png_file.exists():
         raise FileNotFoundError(
             f"Could not find .png image for plot {plot.id}. Your version of "
@@ -245,9 +335,10 @@ def voxel_to_vtk(voxel_file: PathLike, output: PathLike = 'plot.vti'):
         writer.SetInputData(grid)
     else:
         writer.SetInput(grid)
+    output = str(output)
     if not output.endswith(".vti"):
         output += ".vti"
-    writer.SetFileName(str(output))
+    writer.SetFileName(output)
     writer.Write()
 
     return output
@@ -630,7 +721,7 @@ class Plot(PlotBase):
         cv.check_type('plot meshlines', meshlines, dict)
         if 'type' not in meshlines:
             msg = f'Unable to set the meshlines to "{meshlines}" which ' \
-                  'does not have a "type" key'
+                'does not have a "type" key'
             raise ValueError(msg)
 
         elif meshlines['type'] not in ['tally', 'entropy', 'ufs', 'cmfd']:
@@ -936,7 +1027,7 @@ class Plot(PlotBase):
         # Return produced image
         return _get_plot_image(self, cwd)
 
-    def to_vtk(self, output: Optional[PathLike] = None,
+    def to_vtk(self, output: PathLike | None = None,
                openmc_exec: str = 'openmc', cwd: str = '.'):
         """Render plot as an voxel image
 
@@ -968,8 +1059,13 @@ class Plot(PlotBase):
         # Run OpenMC in geometry plotting mode and produces a h5 file
         openmc.plot_geometry(False, openmc_exec, cwd)
 
-        stem = self.filename if self.filename is not None else f'plot_{self.id}'
-        h5_voxel_file = Path(cwd) / f'{stem}.h5'
+        h5_voxel_filename = self.filename if self.filename is not None else f'plot_{self.id}'
+
+        # Add file extension if not already present
+        if Path(h5_voxel_filename).suffix != ".h5":
+            h5_voxel_filename += ".h5"
+
+        h5_voxel_file = Path(cwd) / h5_voxel_filename
         if output is None:
             output = h5_voxel_file.with_suffix('.vti')
 
