@@ -178,13 +178,13 @@ vector<double> sobol_shuffled_scrambled(int32_t dim, uint64_t* seed, uint32_t in
   if (dim > 5) {
     fatal_error("Sobol sampling dimension too large");
   }
-  vector<double> samples(dim, 0.0);
+  vector<double> samples(dim);
 
   uint32_t seed_32 = uint32_t(*seed); // cast to 32 bit
   uint32_t hseed = hash(seed_32);
 
-  index = nested_uniform_scramble_base2(index, hseed);
-  vector<uint32_t> sobol_samples = sobol(dim, index);
+  uint32_t i = nested_uniform_scramble_base2(index, hseed);
+  vector<uint32_t> sobol_samples = sobol(dim, i);
 
   for (int d = 0; d < dim; d++) {
     samples[d] = double(nested_uniform_scramble_base2(sobol_samples[d], hash_combine(hseed, d)) * S);
