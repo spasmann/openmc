@@ -132,7 +132,7 @@ void FlatSourceDomain::update_neutron_source(double k_eff)
     source_regions_.source(se) = 0.0;
   }
 
-  // Add scattering + fission source
+// Add scattering + fission source
 #pragma omp parallel for
   for (int64_t sr = 0; sr < n_source_regions(); sr++) {
     int material = source_regions_.material(sr);
@@ -180,10 +180,10 @@ void FlatSourceDomain::normalize_scalar_flux_and_volumes(
 
 // Normalize scalar flux to total distance travelled by all rays this
 // iteration
-#pragma omp parallel for
-  for (int64_t se = 0; se < n_source_elements(); se++) {
-    source_regions_.scalar_flux_new(se) *= normalization_factor;
-  }
+// #pragma omp parallel for
+//   for (int64_t se = 0; se < n_source_elements(); se++) {
+//     source_regions_.scalar_flux_new(se) *= normalization_factor;
+//   }
 
 // Accumulate cell-wise ray length tallies collected this iteration, then
 // update the simulation-averaged cell-wise volume estimates

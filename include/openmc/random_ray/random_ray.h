@@ -54,6 +54,7 @@ public:
   //----------------------------------------------------------------------------
   // Public data members
   vector<float> angular_flux_;
+  vector<float> particle_weight_;
 
   bool ray_trace_only_ {false}; // If true, only perform geometry operations
 
@@ -61,6 +62,7 @@ private:
   //----------------------------------------------------------------------------
   // Private data members
   vector<float> delta_psi_;
+  vector<float> delta_phi_;
   vector<MomentArray> delta_moments_;
   vector<int> mesh_bins_;
   vector<double> mesh_fractional_lengths_;

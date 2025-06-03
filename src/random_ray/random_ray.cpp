@@ -193,7 +193,9 @@ RandomRaySampleMethod RandomRay::sample_method_ {RandomRaySampleMethod::PRNG};
 RandomRay::RandomRay()
   : angular_flux_(data::mg.num_energy_groups_),
     delta_psi_(data::mg.num_energy_groups_),
-    negroups_(data::mg.num_energy_groups_)
+    negroups_(data::mg.num_energy_groups_),
+    particle_weight_(data::mg.num_energy_groups_),
+    delta_phi_(data::mg.num_energy_groups_)
 {
   if (source_shape_ == RandomRaySourceShape::LINEAR ||
       source_shape_ == RandomRaySourceShape::LINEAR_XY) {
@@ -233,44 +235,17 @@ void RandomRay::event_advance_ray()
     return;
   }
 
-  if (is_active_) {
-    // If the ray is in the active length, need to check if it has
-    // reached its maximum termination distance. If so, reduce
-    // the ray traced length so that the ray does not overrun the
-    // maximum numerical length (so as to avoid numerical bias).
-    if (distance_travelled_ + distance >= distance_active_) {
-      distance = distance_active_ - distance_travelled_;
-      wgt() = 0.0;
-    }
-
-    distance_travelled_ += distance;
-    attenuate_flux(distance, true);
-  } else {
-    // If the ray is still in the dead zone, need to check if it
-    // has entered the active phase. If so, split into two segments (one
-    // representing the final part of the dead zone, the other representing the
-    // first part of the active length) and attenuate each. Otherwise, if the
-    // full length of the segment is within the dead zone, attenuate as normal.
-    if (distance_travelled_ + distance >= distance_inactive_) {
-      is_active_ = true;
-      double distance_dead = distance_inactive_ - distance_travelled_;
-      attenuate_flux(distance_dead, false);
-
-      double distance_alive = distance - distance_dead;
-
-      // Ensure we haven't travelled past the active phase as well
-      if (distance_alive > distance_active_) {
-        distance_alive = distance_active_;
-        wgt() = 0.0;
-      }
-
-      attenuate_flux(distance_alive, true, distance_dead);
-      distance_travelled_ = distance_alive;
-    } else {
-      distance_travelled_ += distance;
-      attenuate_flux(distance, false);
-    }
+  // If the ray is in the active length, need to check if it has
+  // reached its maximum termination distance. If so, reduce
+  // the ray traced length so that the ray does not overrun the
+  // maximum numerical length (so as to avoid numerical bias).
+  if (distance_travelled_ + distance >= distance_active_) {
+    distance = distance_active_ - distance_travelled_;
+    wgt() = 0.0;
   }
+
+  distance_travelled_ += distance;
+  attenuate_flux(distance, true);
 
   // Advance particle
   for (int j = 0; j < n_coord(); ++j) {
@@ -385,14 +360,16 @@ void RandomRay::attenuate_flux_flat_source(
   // Get material
   int material = this->material();
 
-  // MOC incoming flux attenuation + source contribution/attenuation equation
+  // iQMC flux contribution & continuous weight reduction
+  // angular_flux_ renamed to particle_weight_ or something similar
   for (int g = 0; g < negroups_; g++) {
     float sigma_t = domain_->sigma_t_[material * negroups_ + g];
     float tau = sigma_t * distance;
     float exponential = cjosey_exponential(tau); // exponential = 1 - exp(-tau)
-    float new_delta_psi = (angular_flux_[g] - srh.source(g)) * exponential;
-    delta_psi_[g] = new_delta_psi;
-    angular_flux_[g] -= new_delta_psi;
+    // TODO: find fsr volume `dv`
+    float new_delta_phi = particle_weight_[g] * exponential / (sigma_t * srh.volume());
+    delta_phi_[g] = new_delta_phi;
+    particle_weight_[g] *= (-exponential - 1);
   }
 
   // If ray is in the active phase (not in dead zone), make contributions to
@@ -401,19 +378,18 @@ void RandomRay::attenuate_flux_flat_source(
   // Aquire lock for source region
   srh.lock();
 
-  if (is_active) {
-    // Accumulate delta psi into new estimate of source region flux for
-    // this iteration
-    for (int g = 0; g < negroups_; g++) {
-      srh.scalar_flux_new(g) += delta_psi_[g];
-    }
-
-    // Accomulate volume (ray distance) into this iteration's estimate
-    // of the source region's volume
-    srh.volume() += distance;
-
-    srh.n_hits() += 1;
+  // Accumulate delta phi into new estimate of source region flux for
+  // this iteration
+  for (int g = 0; g < negroups_; g++) {
+    srh.scalar_flux_new(g) += delta_phi_[g];
   }
+
+  // Accomulate volume (ray distance) into this iteration's estimate
+  // of the source region's volume
+  srh.volume() += distance;
+
+  srh.n_hits() += 1;
+
 
   // Tally valid position inside the source region (e.g., midpoint of
   // the ray) if not done already
@@ -436,41 +412,40 @@ void RandomRay::attenuate_flux_flat_source_void(
 
   int material = this->material();
 
-  // If ray is in the active phase (not in dead zone), make contributions to
-  // source region bookkeeping
-  if (is_active) {
+  // Make contributions to source region bookkeeping
 
-    // Aquire lock for source region
-    srh.lock();
+  // Aquire lock for source region
+  srh.lock();
 
-    // Accumulate delta psi into new estimate of source region flux for
-    // this iteration
-    for (int g = 0; g < negroups_; g++) {
-      srh.scalar_flux_new(g) += angular_flux_[g] * distance;
-    }
-
-    // Accomulate volume (ray distance) into this iteration's estimate
-    // of the source region's volume
-    srh.volume() += distance;
-    srh.volume_sq() += distance * distance;
-    srh.n_hits() += 1;
-
-    // Tally valid position inside the source region (e.g., midpoint of
-    // the ray) if not done already
-    if (!srh.position_recorded()) {
-      Position midpoint = r + u() * (distance / 2.0);
-      srh.position() = midpoint;
-      srh.position_recorded() = 1;
-    }
-
-    // Release lock
-    srh.unlock();
+  // Accumulate delta phi into new estimate of source region flux for
+  // this iteration
+  // TODO: find fsr `dv`
+  for (int g = 0; g < negroups_; g++) {
+    srh.scalar_flux_new(g) += particle_weight_[g] * distance / srh.volume();
   }
 
-  // Add source to incoming angular flux, assuming void region
+  // Accomulate volume (ray distance) into this iteration's estimate
+  // of the source region's volume
+  srh.volume() += distance;
+  srh.volume_sq() += distance * distance;
+  srh.n_hits() += 1;
+
+  // Tally valid position inside the source region (e.g., midpoint of
+  // the ray) if not done already
+  if (!srh.position_recorded()) {
+    Position midpoint = r + u() * (distance / 2.0);
+    srh.position() = midpoint;
+    srh.position_recorded() = 1;
+  }
+
+  // Release lock
+  srh.unlock();
+
+  // Add source to incoming scalar flux, assuming void region
+  // TODO: not sure if this is correct for iQMC ??
   if (settings::run_mode == RunMode::FIXED_SOURCE) {
     for (int g = 0; g < negroups_; g++) {
-      angular_flux_[g] += srh.external_source(g) * distance;
+      particle_weight_[g] += srh.external_source(g) * distance;
     }
   }
 }
@@ -719,7 +694,7 @@ void RandomRay::initialize_ray(uint64_t ray_id, FlatSourceDomain* domain)
   // Reset particle event counter
   n_event() = 0;
 
-  is_active_ = (distance_inactive_ <= 0.0);
+  is_active_ = true;
 
   wgt() = 1.0;
 
@@ -778,9 +753,15 @@ void RandomRay::initialize_ray(uint64_t ray_id, FlatSourceDomain* domain)
     srh = domain_->source_regions_.get_source_region_handle(sr);
   }
 
+  // Initialize particle weight.
+  // Particle weights in MCDC are set according to 
+  //    w = Q * dv * N_cells / N_particle 
+  // where Q is the source, dv is the cell volume, N_cells is the total number of FSRs, 
+  // and N_particle is the number of particles per batch
   if (!srh.is_numerical_fp_artifact_) {
     for (int g = 0; g < negroups_; g++) {
-      angular_flux_[g] = srh.source(g);
+      float norm = srh.volume() * domain_->n_source_regions() / settings::n_particles;
+      particle_weight_[g] = srh.source(g) * norm;
     }
   }
 }
@@ -799,6 +780,7 @@ SourceSite RandomRay::sample_prng()
   return site;
 }
 
+// TODO: implement rejection sampling for RQMC
 SourceSite RandomRay::sample_rqmc()
 {
   SourceSite site;
@@ -829,7 +811,7 @@ SourceSite RandomRay::sample_rqmc()
   // Sample spatial distribution
   Position xi {samples[0], samples[1], samples[2]};
   // Make a small shift to the source boundary to avoid sampling particles directly on it
-  Position shift {1E-9, 1E-9, 1E-9};
+  Position shift {1E-9, 1E-9, 1E-9}; // Had to increase shift to avoid errors with Sobol
   site.r = (sb->lower_left() + shift) +
            xi * ((sb->upper_right() - shift) - (sb->lower_left() + shift));
 
