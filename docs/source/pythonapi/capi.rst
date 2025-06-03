@@ -79,6 +79,7 @@ Classes
    MeshSurfaceFilter
    MuFilter
    Nuclide
+   ParentNuclideFilter
    ParticleFilter
    PolarFilter
    RectilinearMesh
@@ -90,6 +91,7 @@ Classes
    Tally
    UniverseFilter
    UnstructuredMesh
+   WeightFilter
    WeightWindows
    ZernikeFilter
    ZernikeRadialFilter

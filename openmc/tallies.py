@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections.abc import Iterable, MutableSequence
 import copy
-from functools import partial, reduce
+from functools import partial, reduce, wraps
 from itertools import product
 from numbers import Integral, Real
 import operator
@@ -95,6 +95,10 @@ class Tally(IDManagerMixin):
         An array containing the sample mean for each bin
     std_dev : numpy.ndarray
         An array containing the sample standard deviation for each bin
+    figure_of_merit : numpy.ndarray
+        An array containing the figure of merit for each bin
+
+        .. versionadded:: 0.15.3
     derived : bool
         Whether or not the tally is derived from one or more other tallies
     sparse : bool
@@ -127,6 +131,7 @@ class Tally(IDManagerMixin):
         self._sum_sq = None
         self._mean = None
         self._std_dev = None
+        self._simulation_time = None
         self._with_batch_statistics = False
         self._derived = False
         self._sparse = False
@@ -179,6 +184,25 @@ class Tally(IDManagerMixin):
         parts.append('{: <15}=\t{}'.format('Multiply dens.', self.multiply_density))
         return '\n\t'.join(parts)
 
+    @staticmethod
+    def ensure_results(f):
+        """A decorator to be applied to any method that might use tally results.
+           Results will be loaded if appropriate based on the tally properties.
+
+        Args:
+            f function: Tally method to wrap
+
+        Returns:
+            function: Wrapped function that reads tally results before calling
+            the methodif necessary
+        """
+        @wraps(f)
+        def read(self):
+            if self._sp_filename is not None and not self.derived:
+                self._read_results()
+            return f(self)
+        return read
+
     @property
     def name(self):
         return self._name
@@ -218,6 +242,7 @@ class Tally(IDManagerMixin):
         self._filters = cv.CheckedList(_FILTER_CLASSES, 'tally filters', filters)
 
     @property
+    @ensure_results
     def nuclides(self):
         return self._nuclides
 
@@ -314,6 +339,7 @@ class Tally(IDManagerMixin):
                                         triggers)
 
     @property
+    @ensure_results
     def num_realizations(self):
         return self._num_realizations
 
@@ -340,11 +366,11 @@ class Tally(IDManagerMixin):
         with h5py.File(self._sp_filename, 'r') as f:
             # Set number of realizations
             group = f[f'tallies/tally {self.id}']
-            self.num_realizations = int(group['n_realizations'][()])
+            self._num_realizations = int(group['n_realizations'][()])
 
             # Update nuclides
             nuclide_names = group['nuclides'][()]
-            self.nuclides = [name.decode().strip() for name in nuclide_names]
+            self._nuclides = [name.decode().strip() for name in nuclide_names]
 
             # Extract Tally data from the file
             data = group['results']
@@ -364,16 +390,17 @@ class Tally(IDManagerMixin):
                 self._sum = sps.lil_matrix(self._sum.flatten(), self._sum.shape)
                 self._sum_sq = sps.lil_matrix(self._sum_sq.flatten(), self._sum_sq.shape)
 
+            # Read simulation time (needed for figure of merit)
+            self._simulation_time = f["runtime"]["simulation"][()]
+
         # Indicate that Tally results have been read
         self._results_read = True
 
     @property
+    @ensure_results
     def sum(self):
         if not self._sp_filename or self.derived:
             return None
-
-        # Make sure results have been read
-        self._read_results()
 
         if self.sparse:
             return np.reshape(self._sum.toarray(), self.shape)
@@ -386,12 +413,10 @@ class Tally(IDManagerMixin):
         self._sum = sum
 
     @property
+    @ensure_results
     def sum_sq(self):
         if not self._sp_filename or self.derived:
             return None
-
-        # Make sure results have been read
-        self._read_results()
 
         if self.sparse:
             return np.reshape(self._sum_sq.toarray(), self.shape)
@@ -444,6 +469,16 @@ class Tally(IDManagerMixin):
             return np.reshape(self._std_dev.toarray(), self.shape)
         else:
             return self._std_dev
+
+    @property
+    def figure_of_merit(self):
+        mean = self.mean
+        std_dev = self.std_dev
+        fom = np.zeros_like(mean)
+        nonzero = np.abs(mean) > 0
+        fom[nonzero] = 1.0 / (
+            (std_dev[nonzero] / mean[nonzero])**2 * self._simulation_time)
+        return fom
 
     @property
     def with_batch_statistics(self):
@@ -935,10 +970,24 @@ class Tally(IDManagerMixin):
         statepoint : openmc.PathLike or openmc.StatePoint
             Statepoint used to update tally results
         """
+        # derived tallies are populated with data based on combined tallies
+        # and should not be modified
+        if self.derived:
+            return
+
         if isinstance(statepoint, openmc.StatePoint):
-            self._sp_filename = statepoint._f.filename
+            self._sp_filename = Path(statepoint._f.filename)
         else:
-            self._sp_filename = str(statepoint)
+            self._sp_filename = Path(str(statepoint))
+
+        # reset these properties to ensure that any results access after this
+        # point are based on the current statepoint file
+        self._sum = None
+        self._sum_sq = None
+        self._mean = None
+        self._std_dev = None
+        self._num_realizations = 0
+        self._results_read = False
 
     @classmethod
     def from_xml_element(cls, elem, **kwargs):
@@ -1471,7 +1520,7 @@ class Tally(IDManagerMixin):
                 df.columns = pd.MultiIndex.from_tuples(columns)
 
         # Modify the df.to_string method so that it prints formatted strings.
-        # Credit to http://stackoverflow.com/users/3657742/chrisb for this trick
+        # Credit to https://stackoverflow.com/users/3657742/chrisb for this trick
         df.to_string = partial(df.to_string, float_format=float_format.format)
 
         return df
