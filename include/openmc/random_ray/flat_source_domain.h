@@ -91,6 +91,10 @@ public:
   int64_t n_external_source_regions_ {0}; // Total number of source regions with
                                           // non-zero external source terms
 
+  double
+  simulation_volume_; // Total physical volume of the simulation domain, as
+                      // defined by the 3D box of the random ray source
+
   // 1D array representing source region starting offset for each OpenMC Cell
   // in model::cells
   vector<int64_t> source_region_offsets_;
@@ -160,10 +164,6 @@ protected:
   //----------------------------------------------------------------------------
   // Private data members
   int negroups_; // Number of energy groups in simulation
-
-  double
-    simulation_volume_; // Total physical volume of the simulation domain, as
-                        // defined by the 3D box of the random ray source
 
   // Volumes for each tally and bin/score combination. This intermediate data
   // structure is used when tallying quantities that must be normalized by

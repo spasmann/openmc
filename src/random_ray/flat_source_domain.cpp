@@ -171,10 +171,10 @@ void FlatSourceDomain::update_neutron_source(double k_eff)
 }
 
 // Normalizes flux and updates simulation-averaged volume estimate
-void FlatSourceDomain::normalize_scalar_flux_and_volumes(
-  double total_active_distance_per_iteration)
+void FlatSourceDomain::normalize_scalar_flux_and_volumes(double n_particles,
+  double simulation_volume)
 {
-  double normalization_factor = 1.0 / total_active_distance_per_iteration;
+  double normalization_factor = 1.0 / n_particles;
   double volume_normalization_factor =
     1.0 / (total_active_distance_per_iteration * simulation::current_batch);
 
@@ -203,6 +203,9 @@ void FlatSourceDomain::normalize_scalar_flux_and_volumes(
 void FlatSourceDomain::set_flux_to_flux_plus_source(
   int64_t sr, double volume, int g)
 {
+  // Does NOT add source to flux. Still need the
+  // normalization to SigmaT & volume and was too lazy to
+  // change the name.
   int material = source_regions_.material(sr);
   if (material == MATERIAL_VOID) {
     source_regions_.scalar_flux_new(sr, g) /= volume;
@@ -214,7 +217,6 @@ void FlatSourceDomain::set_flux_to_flux_plus_source(
   } else {
     double sigma_t = sigma_t_[source_regions_.material(sr) * negroups_ + g];
     source_regions_.scalar_flux_new(sr, g) /= (sigma_t * volume);
-    source_regions_.scalar_flux_new(sr, g) += source_regions_.source(sr, g);
   }
 }
 
@@ -280,10 +282,8 @@ int64_t FlatSourceDomain::add_source_to_scalar_flux()
     for (int g = 0; g < negroups_; g++) {
       // There are three scenarios we need to consider:
       if (volume_iteration > 0.0) {
-        // 1. If the FSR was hit this iteration, then the new flux is equal to
-        // the flat source from the previous iteration plus the contributions
-        // from rays passing through the source region (computed during the
-        // transport sweep)
+        // 1. If the FSR was hit this iteration, then the new flux is normalized
+        // by the Sigma_T and the source region volume.
         set_flux_to_flux_plus_source(sr, volume, g);
       } else if (volume_simulation_avg > 0.0) {
         // 2. If the FSR was not hit this iteration, but has been hit some

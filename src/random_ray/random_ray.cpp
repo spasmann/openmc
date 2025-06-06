@@ -366,8 +366,7 @@ void RandomRay::attenuate_flux_flat_source(
     float sigma_t = domain_->sigma_t_[material * negroups_ + g];
     float tau = sigma_t * distance;
     float exponential = cjosey_exponential(tau); // exponential = 1 - exp(-tau)
-    // TODO: find fsr volume `dv`
-    float new_delta_phi = particle_weight_[g] * exponential / (sigma_t * srh.volume());
+    float new_delta_phi = particle_weight_[g] * exponential;
     delta_phi_[g] = new_delta_phi;
     particle_weight_[g] *= (-exponential - 1);
   }
@@ -386,7 +385,7 @@ void RandomRay::attenuate_flux_flat_source(
 
   // Accomulate volume (ray distance) into this iteration's estimate
   // of the source region's volume
-  srh.volume() += distance;
+  // srh.volume() += distance;
 
   srh.n_hits() += 1;
 
@@ -421,13 +420,13 @@ void RandomRay::attenuate_flux_flat_source_void(
   // this iteration
   // TODO: find fsr `dv`
   for (int g = 0; g < negroups_; g++) {
-    srh.scalar_flux_new(g) += particle_weight_[g] * distance / srh.volume();
+    srh.scalar_flux_new(g) += particle_weight_[g] * distance;
   }
 
   // Accomulate volume (ray distance) into this iteration's estimate
   // of the source region's volume
-  srh.volume() += distance;
-  srh.volume_sq() += distance * distance;
+  // srh.volume() += distance;
+  // srh.volume_sq() += distance * distance;
   srh.n_hits() += 1;
 
   // Tally valid position inside the source region (e.g., midpoint of
@@ -440,14 +439,6 @@ void RandomRay::attenuate_flux_flat_source_void(
 
   // Release lock
   srh.unlock();
-
-  // Add source to incoming scalar flux, assuming void region
-  // TODO: not sure if this is correct for iQMC ??
-  if (settings::run_mode == RunMode::FIXED_SOURCE) {
-    for (int g = 0; g < negroups_; g++) {
-      particle_weight_[g] += srh.external_source(g) * distance;
-    }
-  }
 }
 
 void RandomRay::attenuate_flux_linear_source(
@@ -757,13 +748,18 @@ void RandomRay::initialize_ray(uint64_t ray_id, FlatSourceDomain* domain)
   // Particle weights in MCDC are set according to 
   //    w = Q * dv * N_cells / N_particle 
   // where Q is the source, dv is the cell volume, N_cells is the total number of FSRs, 
-  // and N_particle is the number of particles per batch
+  // and N_particle is the number of particles per batch. For a uniform grid, 
+  // dv * N_cells = total volume
   if (!srh.is_numerical_fp_artifact_) {
     for (int g = 0; g < negroups_; g++) {
-      float norm = srh.volume() * domain_->n_source_regions() / settings::n_particles;
+      float norm = domain_->simulation_volume_ / settings::n_particles;
       particle_weight_[g] = srh.source(g) * norm;
     }
   }
+
+  // Increment the sample count for the source region volume estimate
+  srh.n_samples() += 1;
+
 }
 
 SourceSite RandomRay::sample_prng()

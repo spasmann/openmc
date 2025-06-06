@@ -148,6 +148,7 @@ public:
   int* material_;
   int* is_small_;
   int* n_hits_;
+  int* n_samples_;
   int* birthday_;
   OpenMPMutex* lock_;
   double* volume_;
@@ -200,6 +201,9 @@ public:
 
   int& n_hits() { return *n_hits_; }
   const int n_hits() const { return *n_hits_; }
+
+  int& n_samples() { return *n_samples_; }
+  const int n_samples() const { return *n_samples_; }
 
   void lock() { lock_->lock(); }
   void unlock() { lock_->unlock(); }
@@ -331,6 +335,7 @@ public:
   int is_small_ {0};  //!< Is it "small", receiving < 1.5 hits per iteration?
   int n_hits_ {0};    //!< Number of total hits (ray crossings)
                       // Mesh that subdivides this source region
+  int n_samples_ {0}; //!< Total number of rays emitted in this source region
   int mesh_ {C_NONE}; //!< Index in openmc::model::meshes array that subdivides
                       //!< this source region
   int64_t parent_sr_ {C_NONE}; //!< Index of a parent source region
@@ -400,6 +405,9 @@ public:
 
   int& n_hits(int64_t sr) { return n_hits_[sr]; }
   const int n_hits(int64_t sr) const { return n_hits_[sr]; }
+
+  int& n_samples(int64_t sr) { return n_samples_[sr]; }
+  const int n_samples(int64_t sr) const { return n_samples_[sr]; }
 
   OpenMPMutex& lock(int64_t sr) { return lock_[sr]; }
   const OpenMPMutex& lock(int64_t sr) const { return lock_[sr]; }
@@ -628,6 +636,7 @@ private:
   vector<int> material_;
   vector<int> is_small_;
   vector<int> n_hits_;
+  vector<int> n_samples_;
   vector<int> mesh_;
   vector<int64_t> parent_sr_;
   vector<OpenMPMutex> lock_;
