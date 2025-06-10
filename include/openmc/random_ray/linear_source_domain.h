@@ -22,7 +22,7 @@ public:
   // Methods
   void update_neutron_source(double k_eff) override;
   void normalize_scalar_flux_and_volumes(
-    double total_active_distance_per_iteration) override;
+    double total_active_distance_per_iteration);
 
   void batch_reset() override;
   void accumulate_iteration_flux() override;
