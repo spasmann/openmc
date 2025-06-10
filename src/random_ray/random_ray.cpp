@@ -239,10 +239,19 @@ void RandomRay::event_advance_ray()
   // reached its maximum termination distance. If so, reduce
   // the ray traced length so that the ray does not overrun the
   // maximum numerical length (so as to avoid numerical bias).
-  if (distance_travelled_ + distance >= distance_active_) {
-    distance = distance_active_ - distance_travelled_;
+  // if (distance_travelled_ + distance >= distance_active_) {
+  //   distance = distance_active_ - distance_travelled_;
+  //   wgt() = 0.0;
+  // }
+  // iQMC: I replace the active distance check with a min. weight threshold
+  double total_w = 0.0;
+  for (int g = 0; g < negroups_; g++) {
+    total_w += particle_weight_[g];
+  }
+  if (total_w <= FP_PRECISION){
     wgt() = 0.0;
   }
+
 
   distance_travelled_ += distance;
   attenuate_flux(distance, true);
