@@ -101,6 +101,7 @@ void FlatSourceDomain::batch_reset()
   for (int64_t sr = 0; sr < n_source_regions(); sr++) {
     source_regions_.volume(sr) = 0.0;
     source_regions_.volume_sq(sr) = 0.0;
+    source_regions_.n_samples(sr) = 0.0;
   }
 
 #pragma omp parallel for
@@ -171,11 +172,11 @@ void FlatSourceDomain::update_neutron_source(double k_eff)
 }
 
 // Normalizes flux and updates simulation-averaged volume estimate
-void FlatSourceDomain::normalize_scalar_flux_and_volumes(double n_particles, double simulation_volume)
+void FlatSourceDomain::normalize_scalar_flux_and_volumes(double n_particles)
 {
-  double normalization_factor = simulation_volume / n_particles;
+  double normalization_factor = 1.0 / n_particles;
   double volume_normalization_factor =
-    simulation_volume / (n_particles * simulation::current_batch);
+    1.0 / (n_particles * simulation::current_batch);
 
 // Normalize scalar flux to total distance travelled by all rays this
 // iteration
@@ -189,15 +190,12 @@ void FlatSourceDomain::normalize_scalar_flux_and_volumes(double n_particles, dou
 #pragma omp parallel for
   for (int64_t sr = 0; sr < n_source_regions(); sr++) {
     source_regions_.volume_t(sr) += source_regions_.n_samples(sr);
-    source_regions_.volume_sq_t(sr) += source_regions_.volume_sq(sr) * source_regions_.volume_sq(sr);
+    source_regions_.volume_sq_t(sr) += source_regions_.n_samples(sr) * source_regions_.n_samples(sr);
     // source_regions_.volume_t(sr) += source_regions_.volume(sr);
     // source_regions_.volume_sq_t(sr) += source_regions_.volume_sq(sr);
-    source_regions_.volume_naive(sr) =
-      source_regions_.volume(sr) * normalization_factor;
-    source_regions_.volume_sq(sr) =
-      source_regions_.volume_sq_t(sr) / source_regions_.volume_t(sr);
-    source_regions_.volume(sr) =
-      source_regions_.volume_t(sr) * volume_normalization_factor;
+    source_regions_.volume_naive(sr) = source_regions_.n_samples(sr) * normalization_factor;
+    source_regions_.volume_sq(sr) = source_regions_.volume_sq_t(sr) / source_regions_.volume_t(sr);
+    source_regions_.volume(sr) = source_regions_.volume_t(sr) * volume_normalization_factor;
   }
 }
 

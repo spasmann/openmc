@@ -243,7 +243,8 @@ void RandomRay::event_advance_ray()
   //   distance = distance_active_ - distance_travelled_;
   //   wgt() = 0.0;
   // }
-  // iQMC: I replace the active distance check with a min. weight threshold
+
+  // iQMC: replace the active distance check with a min weight threshold
   double total_w = 0.0;
   for (int g = 0; g < negroups_; g++) {
     total_w += particle_weight_[g];
@@ -251,7 +252,6 @@ void RandomRay::event_advance_ray()
   if (total_w <= FP_PRECISION){
     wgt() = 0.0;
   }
-
 
   distance_travelled_ += distance;
   attenuate_flux(distance, true);
