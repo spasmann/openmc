@@ -368,7 +368,6 @@ void RandomRay::attenuate_flux_flat_source(
 
   // Get material
   int material = this->material();
-
   // iQMC flux contribution & continuous weight reduction
   // angular_flux_ renamed to particle_weight_ or something similar
   for (int g = 0; g < negroups_; g++) {
@@ -377,7 +376,7 @@ void RandomRay::attenuate_flux_flat_source(
     float exponential = cjosey_exponential(tau); // exponential = 1 - exp(-tau)
     float new_delta_phi = particle_weight_[g] * exponential;
     delta_phi_[g] = new_delta_phi;
-    particle_weight_[g] *= (-exponential - 1);
+    particle_weight_[g] *= 1 - exponential;
   }
 
   // If ray is in the active phase (not in dead zone), make contributions to
@@ -390,6 +389,7 @@ void RandomRay::attenuate_flux_flat_source(
   // this iteration
   for (int g = 0; g < negroups_; g++) {
     srh.scalar_flux_new(g) += delta_phi_[g];
+    // fmt::print("{},\n", delta_phi_[g]);
   }
 
   // Accomulate volume (ray distance) into this iteration's estimate
