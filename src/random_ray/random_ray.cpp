@@ -365,18 +365,17 @@ void RandomRay::attenuate_flux_flat_source(
 {
   // The number of geometric intersections is counted for reporting purposes
   n_event()++;
-
   // Get material
   int material = this->material();
   // iQMC flux contribution & continuous weight reduction
-  // angular_flux_ renamed to particle_weight_ or something similar
+  // angular_flux_ renamed to particle_weight_
   for (int g = 0; g < negroups_; g++) {
     float sigma_t = domain_->sigma_t_[material * negroups_ + g];
     float tau = sigma_t * distance;
     float exponential = cjosey_exponential(tau); // exponential = 1 - exp(-tau)
     float new_delta_phi = particle_weight_[g] * exponential;
     delta_phi_[g] = new_delta_phi;
-    particle_weight_[g] *= 1 - exponential;
+    particle_weight_[g] *= (1 - exponential);
   }
 
   // If ray is in the active phase (not in dead zone), make contributions to
@@ -389,7 +388,6 @@ void RandomRay::attenuate_flux_flat_source(
   // this iteration
   for (int g = 0; g < negroups_; g++) {
     srh.scalar_flux_new(g) += delta_phi_[g];
-    // fmt::print("{},\n", delta_phi_[g]);
   }
 
   // Accomulate volume (ray distance) into this iteration's estimate
@@ -761,8 +759,8 @@ void RandomRay::initialize_ray(uint64_t ray_id, FlatSourceDomain* domain)
   // dv * N_cells = total volume
   if (!srh.is_numerical_fp_artifact_) {
     for (int g = 0; g < negroups_; g++) {
-      float norm = domain_->simulation_volume_ / settings::n_particles;
-      particle_weight_[g] = srh.source(g) * norm;
+      // float norm = domain_->simulation_volume_ / settings::n_particles;
+      particle_weight_[g] = srh.source(g);// * norm;
     }
   }
 
