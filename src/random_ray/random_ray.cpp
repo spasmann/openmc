@@ -249,7 +249,7 @@ void RandomRay::event_advance_ray()
   for (int g = 0; g < negroups_; g++) {
     total_w += particle_weight_[g];
   }
-  if (total_w <= FP_PRECISION){
+  if (total_w <= 1e-9){
     wgt() = 0.0;
   }
 

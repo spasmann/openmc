@@ -649,11 +649,21 @@ void RandomRaySimulation::print_results_random_ray(
       fatal_error("Invalid random ray source shape");
     }
     fmt::print(" Source Shape                      = {}\n", shape);
-    std::string sample_method =
-      (RandomRay::sample_method_ == RandomRaySampleMethod::PRNG) ? "PRNG"
-                                                                 : "Halton";
-    fmt::print(" Sample Method                     = {}\n", sample_method);
-
+    std::string sampler;
+    switch (RandomRay::sample_method_) {
+    case RandomRaySampleMethod::PRNG:
+      sampler = "PRNG";
+      break;
+    case RandomRaySampleMethod::HALTON:
+      sampler = "Halton";
+      break;
+    case RandomRaySampleMethod::SOBOL:
+      sampler = "Sobol";
+      break;
+    default:
+      fatal_error("Invalid random ray sample method");
+    }
+    fmt::print(" Sample Method                     = {}\n", sampler);
     if (domain_->is_transport_stabilization_needed_) {
       fmt::print(" Transport XS Stabilization Used   = YES (rho = {:.3f})\n",
         FlatSourceDomain::diagonal_stabilization_rho_);
