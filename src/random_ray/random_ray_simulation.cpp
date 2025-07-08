@@ -490,8 +490,8 @@ void RandomRaySimulation::simulate()
 
       // Normalize scalar flux and update volumes
       domain_->normalize_scalar_flux_and_volumes(settings::n_particles,
-                                                volume_distance_per_batch,
-                                                total_volume_distance_);
+                                                 volume_distance_per_batch,
+                                                 total_volume_distance_);
 
       // Add source to scalar flux, compute number of FSR hits
       int64_t n_hits = domain_->add_source_to_scalar_flux();

@@ -723,8 +723,6 @@ void RandomRay::initialize_ray(uint64_t ray_id, FlatSourceDomain* domain)
     site = sample_prng();
     break;
   case RandomRaySampleMethod::HALTON:
-    site = sample_rqmc();
-    break;
   case RandomRaySampleMethod::SOBOL:
     site = sample_rqmc();
     break;
