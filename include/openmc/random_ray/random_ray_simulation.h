@@ -51,6 +51,8 @@ private:
   // Tracks the average FSR miss rate for analysis and reporting
   double avg_miss_rate_ {0.0};
 
+  double total_volume_distance_ {0.0};
+
   // Tracks the total number of geometric intersections by all rays for
   // reporting
   uint64_t total_geometric_intersections_ {0};

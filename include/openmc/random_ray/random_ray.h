@@ -55,6 +55,7 @@ public:
   // Public data members
   vector<float> angular_flux_;
   vector<float> particle_weight_;
+  double distance_travelled_ {0};
 
   bool ray_trace_only_ {false}; // If true, only perform geometry operations
 
@@ -70,7 +71,6 @@ private:
   int negroups_;
   FlatSourceDomain* domain_ {nullptr}; // pointer to domain that has flat source
                                        // data needed for ray transport
-  double distance_travelled_ {0};
   bool is_active_ {false};
   bool is_alive_ {true};
 }; // class RandomRay

@@ -29,7 +29,10 @@ public:
   // Methods
   virtual void update_neutron_source(double k_eff);
   double compute_k_eff(double k_eff_old) const;
-  virtual void normalize_scalar_flux_and_volumes(double n_particles);
+  virtual void normalize_scalar_flux_and_volumes(
+    double n_particles,
+    double volume_distance_per_batch,
+    double total_volume_distance);
 
   int64_t add_source_to_scalar_flux();
   virtual void batch_reset();

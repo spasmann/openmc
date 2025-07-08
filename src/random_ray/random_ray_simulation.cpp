@@ -465,6 +465,7 @@ void RandomRaySimulation::simulate()
       // Start timer for transport
       simulation::time_transport.start();
 
+      double volume_distance_per_batch = 0.0;
 // Transport sweep over all random rays for the iteration
 #pragma omp parallel for schedule(dynamic)                                     \
   reduction(+ : total_geometric_intersections_)
@@ -472,6 +473,7 @@ void RandomRaySimulation::simulate()
         RandomRay ray(i, domain_.get());
         total_geometric_intersections_ +=
           ray.transport_history_based_single_ray();
+        volume_distance_per_batch += ray.distance_travelled_;
       }
 
       simulation::time_transport.stop();
@@ -481,9 +483,15 @@ void RandomRaySimulation::simulate()
       if (RandomRay::mesh_subdivision_enabled_) {
         domain_->finalize_discovered_source_regions();
       }
+      
+      // fmt::print("Distance Traveled this Batch {}\n", volume_distance_per_batch);
+      total_volume_distance_ += volume_distance_per_batch;
+      // fmt::print("Average Distance Traveled {}\n", total_volume_distance_ / simulation::current_batch);
 
       // Normalize scalar flux and update volumes
-      domain_->normalize_scalar_flux_and_volumes(settings::n_particles);
+      domain_->normalize_scalar_flux_and_volumes(settings::n_particles,
+                                                volume_distance_per_batch,
+                                                total_volume_distance_);
 
       // Add source to scalar flux, compute number of FSR hits
       int64_t n_hits = domain_->add_source_to_scalar_flux();

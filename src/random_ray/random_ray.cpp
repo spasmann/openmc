@@ -253,8 +253,13 @@ void RandomRay::event_advance_ray()
     wgt() = 0.0;
   }
 
-  distance_travelled_ += distance;
-  attenuate_flux(distance, true);
+  // distance_travelled_ += distance;
+  if (distance_travelled_) {
+    attenuate_flux(distance, true);
+  } else {
+    attenuate_flux(distance, true);
+    // fmt::print("ID {}, distance {}\n", id(), distance);
+  }
 
   // Advance particle
   for (int j = 0; j < n_coord(); ++j) {
@@ -384,6 +389,16 @@ void RandomRay::attenuate_flux_flat_source(
   // Aquire lock for source region
   srh.lock();
 
+  // Repurposed the is_active variable as a flag to accumulate ray distance
+  // for the volume estimate but only on the first "advance ray" step
+  if (is_active) {
+    // Accomulate volume (ray distance) into this iteration's estimate
+    // of the source region's volume
+    srh.volume() += distance;
+    srh.volume_sq() += distance * distance;
+    distance_travelled_ += distance;
+  }
+
   // Accumulate delta phi into new estimate of source region flux for
   // this iteration
   for (int g = 0; g < negroups_; g++) {
@@ -425,15 +440,17 @@ void RandomRay::attenuate_flux_flat_source_void(
 
   // Accumulate delta phi into new estimate of source region flux for
   // this iteration
-  // TODO: find fsr `dv`
   for (int g = 0; g < negroups_; g++) {
     srh.scalar_flux_new(g) += particle_weight_[g] * distance;
   }
 
-  // Accomulate volume (ray distance) into this iteration's estimate
-  // of the source region's volume
-  // srh.volume() += distance;
-  // srh.volume_sq() += distance * distance;
+  if (is_active) {
+    // Accomulate volume (ray distance) into this iteration's estimate
+    // of the source region's volume
+    srh.volume() += distance;
+    srh.volume_sq() += distance * distance;
+    distance_travelled_ += distance;
+  }
   srh.n_hits() += 1;
 
   // Tally valid position inside the source region (e.g., midpoint of
@@ -765,7 +782,7 @@ void RandomRay::initialize_ray(uint64_t ray_id, FlatSourceDomain* domain)
   }
 
   // Increment the sample count for the source region volume estimate
-  srh.n_samples() += 1;
+  // srh.n_samples() += 1;
 
 }
 
