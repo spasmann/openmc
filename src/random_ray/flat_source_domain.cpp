@@ -172,41 +172,12 @@ void FlatSourceDomain::update_neutron_source(double k_eff)
 }
 
 // Normalizes flux and updates simulation-averaged volume estimate
-// void FlatSourceDomain::normalize_scalar_flux_and_volumes(double n_particles)
-// {
-//   double normalization_factor = 1.0 / n_particles;
-//   double volume_normalization_factor =
-//     1.0 / (n_particles * simulation::current_batch);
-
-// // Normalize scalar flux to total distance travelled by all rays this
-// // iteration
-// #pragma omp parallel for
-//   for (int64_t se = 0; se < n_source_elements(); se++) {
-//     source_regions_.scalar_flux_new(se) *= normalization_factor;
-//   }
-
-// // Accumulate cell-wise ray length tallies collected this iteration, then
-// // update the simulation-averaged cell-wise volume estimates
-// #pragma omp parallel for
-//   for (int64_t sr = 0; sr < n_source_regions(); sr++) {
-//     source_regions_.volume_t(sr) += source_regions_.n_samples(sr);
-//     source_regions_.volume_sq_t(sr) += source_regions_.n_samples(sr) * source_regions_.n_samples(sr);
-//     // source_regions_.volume_t(sr) += source_regions_.volume(sr);
-//     // source_regions_.volume_sq_t(sr) += source_regions_.volume_sq(sr);
-//     source_regions_.volume_naive(sr) = source_regions_.n_samples(sr) * normalization_factor;
-//     source_regions_.volume_sq(sr) = source_regions_.volume_sq_t(sr) / source_regions_.volume_t(sr);
-//     source_regions_.volume(sr) = source_regions_.volume_t(sr) * volume_normalization_factor;
-//   }
-// }
-
-// Normalizes flux and updates simulation-averaged volume estimate
 void FlatSourceDomain::normalize_scalar_flux_and_volumes(
   double n_particles,
   double volume_distance_per_batch,
   double total_volume_distance)
 {
-  // Normalize scalar flux to total distance travelled by all rays this
-  // iteration
+  // Normalize scalar flux
   double flux_normalization_factor = 1.0 / n_particles;
 #pragma omp parallel for
   for (int64_t se = 0; se < n_source_elements(); se++) {
@@ -225,7 +196,6 @@ void FlatSourceDomain::normalize_scalar_flux_and_volumes(
     source_regions_.volume_naive(sr) = source_regions_.volume(sr) * naive_norm_factor;
     source_regions_.volume_sq(sr) = source_regions_.volume_sq_t(sr) / source_regions_.volume_t(sr);
     source_regions_.volume(sr) = source_regions_.volume_t(sr) * avg_norm_factor;
-      // fmt::print("{},\n", source_regions_.volume(sr));
   }
 }
 

@@ -464,7 +464,7 @@ void RandomRaySimulation::simulate()
 
       // Start timer for transport
       simulation::time_transport.start();
-
+      
       double volume_distance_per_batch = 0.0;
 // Transport sweep over all random rays for the iteration
 #pragma omp parallel for schedule(dynamic)                                     \
@@ -473,7 +473,7 @@ void RandomRaySimulation::simulate()
         RandomRay ray(i, domain_.get());
         total_geometric_intersections_ +=
           ray.transport_history_based_single_ray();
-        volume_distance_per_batch += ray.distance_travelled_;
+        volume_distance_per_batch += ray.volume_distance_travelled;
       }
 
       simulation::time_transport.stop();

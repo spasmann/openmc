@@ -254,11 +254,10 @@ void RandomRay::event_advance_ray()
   }
 
   // distance_travelled_ += distance;
-  if (distance_travelled_) {
-    attenuate_flux(distance, true);
+  if (volume_distance_travelled) {
+    attenuate_flux(distance, false);
   } else {
     attenuate_flux(distance, true);
-    // fmt::print("ID {}, distance {}\n", id(), distance);
   }
 
   // Advance particle
@@ -395,8 +394,8 @@ void RandomRay::attenuate_flux_flat_source(
     // Accomulate volume (ray distance) into this iteration's estimate
     // of the source region's volume
     srh.volume() += distance;
-    srh.volume_sq() += distance * distance;
-    distance_travelled_ += distance;
+    // srh.volume_sq() += distance * distance;
+    volume_distance_travelled += distance;
   }
 
   // Accumulate delta phi into new estimate of source region flux for
@@ -449,7 +448,7 @@ void RandomRay::attenuate_flux_flat_source_void(
     // of the source region's volume
     srh.volume() += distance;
     srh.volume_sq() += distance * distance;
-    distance_travelled_ += distance;
+    volume_distance_travelled += distance;
   }
   srh.n_hits() += 1;
 
