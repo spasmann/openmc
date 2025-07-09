@@ -521,7 +521,7 @@ void RandomRaySimulation::simulate()
       domain_->flux_swap();
 
       // Check for any obvious insabilities/nans/infs
-      // instability_check(n_hits, k_eff_, avg_miss_rate_);
+      instability_check(n_hits, k_eff_, avg_miss_rate_);
     } // End MPI master work
 
     // Finalize the current batch
