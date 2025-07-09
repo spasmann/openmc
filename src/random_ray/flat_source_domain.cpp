@@ -173,20 +173,20 @@ void FlatSourceDomain::update_neutron_source(double k_eff)
 
 // Normalizes flux and updates simulation-averaged volume estimate
 void FlatSourceDomain::normalize_scalar_flux_and_volumes(
-  double n_particles,
-  double volume_distance_per_batch,
-  double total_volume_distance)
+  double n_particles, double active_distance)
 {
   // Normalize scalar flux
-  double flux_normalization_factor = 1.0 / n_particles;
+  double flux_norm_factor = 1.0 / n_particles;
 #pragma omp parallel for
   for (int64_t se = 0; se < n_source_elements(); se++) {
-    source_regions_.scalar_flux_new(se) *= flux_normalization_factor;
+    source_regions_.scalar_flux_new(se) *= flux_norm_factor;
   }
 
   // Normalize volume estimates
-  double naive_norm_factor = 1.0 / volume_distance_per_batch;
-  double avg_norm_factor = 1.0 / total_volume_distance;
+  double total_active_distance_per_iteration = active_distance * n_particles;
+  double naive_norm_factor = 1.0 / total_active_distance_per_iteration;
+  double avg_norm_factor = 1.0 / (total_active_distance_per_iteration * simulation::current_batch);
+  
   // Accumulate cell-wise ray length tallies collected this iteration, then
   // update the simulation-averaged cell-wise volume estimates
 #pragma omp parallel for

@@ -12,7 +12,6 @@ namespace openmc {
 SourceRegionHandle::SourceRegionHandle(SourceRegion& sr)
   : negroups_(sr.scalar_flux_old_.size()), material_(&sr.material_),
     is_small_(&sr.is_small_), n_hits_(&sr.n_hits_),
-    // n_samples_(&sr.n_samples_),
     is_linear_(sr.source_gradients_.size() > 0), lock_(&sr.lock_),
     volume_(&sr.volume_), volume_t_(&sr.volume_t_), volume_sq_(&sr.volume_sq_),
     volume_sq_t_(&sr.volume_sq_t_), volume_naive_(&sr.volume_naive_),
@@ -92,7 +91,6 @@ void SourceRegionContainer::push_back(const SourceRegion& sr)
   material_.push_back(sr.material_);
   is_small_.push_back(sr.is_small_);
   n_hits_.push_back(sr.n_hits_);
-  // n_samples_.push_back(sr.n_samples_);
   lock_.push_back(sr.lock_);
   volume_.push_back(sr.volume_);
   volume_t_.push_back(sr.volume_t_);
@@ -146,7 +144,6 @@ void SourceRegionContainer::assign(
   material_.clear();
   is_small_.clear();
   n_hits_.clear();
-  // n_samples_.clear();
   lock_.clear();
   volume_.clear();
   volume_t_.clear();
@@ -204,7 +201,6 @@ SourceRegionHandle SourceRegionContainer::get_source_region_handle(int64_t sr)
   handle.material_ = &material(sr);
   handle.is_small_ = &is_small(sr);
   handle.n_hits_ = &n_hits(sr);
-  // handle.n_samples_ = &n_samples(sr);
   handle.is_linear_ = is_linear();
   handle.lock_ = &lock(sr);
   handle.volume_ = &volume(sr);
@@ -247,7 +243,6 @@ SourceRegionHandle SourceRegionContainer::get_source_region_handle(int64_t sr)
 void SourceRegionContainer::adjoint_reset()
 {
   std::fill(n_hits_.begin(), n_hits_.end(), 0);
-  // std::fill(n_samples_.begin(), n_samples_.end(), 0);
   std::fill(volume_.begin(), volume_.end(), 0.0);
   std::fill(volume_t_.begin(), volume_t_.end(), 0.0);
   std::fill(volume_sq_.begin(), volume_sq_.end(), 0.0);

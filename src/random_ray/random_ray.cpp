@@ -246,19 +246,21 @@ void RandomRay::event_advance_ray()
 
   // iQMC: replace the active distance check with a min weight threshold
   double total_w = 0.0;
+  double threshold = 1e-9;
   for (int g = 0; g < negroups_; g++) {
     total_w += particle_weight_[g];
   }
-  if (total_w <= 1e-9){
+  if (total_w < threshold && distance_travelled_ >= distance_active_){
     wgt() = 0.0;
   }
 
-  // distance_travelled_ += distance;
-  if (volume_distance_travelled) {
-    attenuate_flux(distance, false);
-  } else {
-    attenuate_flux(distance, true);
+  if (mpi::master) {
+    if (total_w == 0.0 && distance_travelled_ < distance_active_) {
+      warning(fmt::format("Particle terminated prior to minimum volume distance.\nDecrease active distance."));
+      }
   }
+
+  attenuate_flux(distance, true);
 
   // Advance particle
   for (int j = 0; j < n_coord(); ++j) {
@@ -382,21 +384,8 @@ void RandomRay::attenuate_flux_flat_source(
     particle_weight_[g] *= (1 - exponential);
   }
 
-  // If ray is in the active phase (not in dead zone), make contributions to
-  // source region bookkeeping
-
   // Aquire lock for source region
   srh.lock();
-
-  // Repurposed the is_active variable as a flag to accumulate ray distance
-  // for the volume estimate but only on the first "advance ray" step
-  if (is_active) {
-    // Accomulate volume (ray distance) into this iteration's estimate
-    // of the source region's volume
-    srh.volume() += distance;
-    // srh.volume_sq() += distance * distance;
-    volume_distance_travelled += distance;
-  }
 
   // Accumulate delta phi into new estimate of source region flux for
   // this iteration
@@ -410,13 +399,23 @@ void RandomRay::attenuate_flux_flat_source(
 
   srh.n_hits() += 1;
 
-
   // Tally valid position inside the source region (e.g., midpoint of
   // the ray) if not done already
   if (!srh.position_recorded()) {
     Position midpoint = r + u() * (distance / 2.0);
     srh.position() = midpoint;
     srh.position_recorded() = 1;
+  }
+
+  if (distance_travelled_ < distance_active_) {
+    if (distance_travelled_ + distance >= distance_active_) {
+      distance = distance_active_ - distance_travelled_;
+    }
+    // Accomulate volume (ray distance) into this iteration's estimate
+    // of the source region's volume
+    srh.volume() += distance;
+    // srh.volume_sq() += distance * distance;
+    distance_travelled_ += distance;
   }
 
   // Release lock
@@ -443,13 +442,6 @@ void RandomRay::attenuate_flux_flat_source_void(
     srh.scalar_flux_new(g) += particle_weight_[g] * distance;
   }
 
-  if (is_active) {
-    // Accomulate volume (ray distance) into this iteration's estimate
-    // of the source region's volume
-    srh.volume() += distance;
-    srh.volume_sq() += distance * distance;
-    volume_distance_travelled += distance;
-  }
   srh.n_hits() += 1;
 
   // Tally valid position inside the source region (e.g., midpoint of
@@ -458,6 +450,17 @@ void RandomRay::attenuate_flux_flat_source_void(
     Position midpoint = r + u() * (distance / 2.0);
     srh.position() = midpoint;
     srh.position_recorded() = 1;
+  }
+
+  if (distance_travelled_ < distance_active_) {
+    if (distance_travelled_ + distance >= distance_active_) {
+      distance = distance_active_ - distance_travelled_;
+    }
+    // Accomulate volume (ray distance) into this iteration's estimate
+    // of the source region's volume
+    srh.volume() += distance;
+    srh.volume_sq() += distance * distance;
+    distance_travelled_ += distance;
   }
 
   // Release lock
@@ -777,10 +780,6 @@ void RandomRay::initialize_ray(uint64_t ray_id, FlatSourceDomain* domain)
       particle_weight_[g] = srh.source(g);// * norm;
     }
   }
-
-  // Increment the sample count for the source region volume estimate
-  // srh.n_samples() += 1;
-
 }
 
 SourceSite RandomRay::sample_prng()

@@ -55,9 +55,7 @@ public:
   // Public data members
   vector<float> angular_flux_;
   vector<float> particle_weight_;
-  double distance_travelled_ {0};
-  double volume_distance_travelled {0.0};
-
+  double distance_travelled_ {0.0};
   bool ray_trace_only_ {false}; // If true, only perform geometry operations
 
 private:
